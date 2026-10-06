@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>WingCO Team Pulse</title>
+<style>
+:root{--bg:#f7f7fa;--card:#fff;--fg:#16161d;--mut:#6b6b7a;--acc:#4f46e5;--bar:#e4e4ee}
+@media(prefers-color-scheme:dark){:root{--bg:#121218;--card:#1c1c26;--fg:#eee;--mut:#9a9aab;--bar:#2c2c3a}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:24px}
+.wrap{max-width:900px;margin:auto}.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:12px}
+.big{font-size:28px;font-weight:700}.mut{color:var(--mut);font-size:13px}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.lab{width:150px;overflow:hidden;text-overflow:ellipsis}
+.track{flex:1;background:var(--bar);border-radius:4px;height:14px}.fill{height:100%;border-radius:4px;background:var(--acc)}
+input,select,button{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--bar);background:var(--card);color:var(--fg)}
+button{background:var(--acc);color:#fff;border:0;cursor:pointer}
+</style></head><body><div class="wrap">
+<h1>WingCO Team Pulse</h1>
+<p class="mut">Anonymous, aggregated trends only. Individual messages and identities are never visible, and any group with fewer than 5 people is hidden.</p>
+<div class="card"><input id="tok" type="password" placeholder="Admin token" style="width:260px">
+<select id="days"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select>
+<button id="go">Load</button> <span id="err" class="mut"></span></div>
+<div class="card"><b>Billing</b> <span class="mut">per-seat subscription, minimum 5 seats</span><br><br>
+<input id="seats" type="number" min="5" value="10" style="width:90px"> seats
+<button id="sub">Subscribe / change plan</button> <button id="manage">Manage billing</button> <span id="berr" class="mut"></span></div>
+<div id="out"></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const card=(t,body)=>{const c=document.createElement("div");c.className="card";
+  const h=document.createElement("b");h.textContent=t;c.append(h,body);return c};
+function bars(rows,label=k=>k){const w=document.createElement("div");
+  if(!rows.length){w.className="mut";w.textContent="Not enough people in any group yet.";return w}
+  const max=Math.max(...rows.map(r=>r.count));
+  rows.forEach(r=>{const d=document.createElement("div");d.className="row";
+    d.innerHTML='<div class="lab"></div><div class="track"><div class="fill"></div></div><div class="mut"></div>';
+    d.children[0].textContent=label(r.key);d.children[1].firstChild.style.width=(r.count/max*100)+"%";
+    d.children[2].textContent=r.count+" · intensity "+r.avg_intensity;w.append(d)});return w}
+async function load(){
+  $("err").textContent="";$("out").replaceChildren();
+  const r=await fetch("/api/summary?days="+$("days").value,{headers:{"X-Admin-Token":$("tok").value}});
+  if(!r.ok){$("err").textContent="Invalid token";return}
+  const s=await r.json();
+  if(s.insufficient){const p=document.createElement("p");p.className="mut";
+    p.textContent="Not enough activity yet. Trends appear once at least "+s.k+" people have used WingCO.";
+    $("out").append(p);return}
+  const g=document.createElement("div");g.className="grid";
+  [["Active users",s.active_users],["Rewrites",s.rewrites],["Avg frustration (1-5)",s.avg_intensity]].forEach(([l,v])=>{
+    const c=document.createElement("div");c.className="card";c.innerHTML='<div class="big"></div><div class="mut"></div>';
+    c.children[0].textContent=v;c.children[1].textContent=l;g.append(c)});
+  $("out").append(g,card("Frustration topics",bars(s.by_topic)),card("Directed at",bars(s.by_recipient)),
+    card("By day",bars(s.by_day)),card("By hour of day",bars(s.by_hour,h=>h+":00")))}
+async function bill(path,body){$("berr").textContent="";
+  const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Token":$("tok").value},body:JSON.stringify(body||{})});
+  const d=await r.json();if(d.url)location.href=d.url;else $("berr").textContent=d.detail||"Error"}
+$("sub").onclick=()=>bill("/billing/checkout",{plan:"team",seats:+$("seats").value});
+$("manage").onclick=()=>bill("/billing/portal");
+$("go").onclick=load;
+</script></body></html>

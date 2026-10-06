@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>WingCO Message</title>
+    <link rel="stylesheet" href="/message.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h3>Message (polished by WingCO)</h3>
+        <pre id="polished">Loading…</pre>
+      </div>
+
+      <div class="card lock" id="lock" hidden>
+        <div style="font-size: 28px">🔒</div>
+        <b>The original is hidden</b>
+        <p class="mut">The sender knows Unmask-enabled readers can see what they first wrote.</p>
+        <button id="up">Unlock originals with Premium</button><br />
+        <button class="s" id="refresh">I've subscribed, refresh</button>
+        <div class="mut" id="err"></div>
+      </div>
+
+      <div class="card" id="orig" hidden>
+        <h3>Original (as first written)</h3>
+        <pre id="origText"></pre>
+      </div>
+
+      <p class="mut" style="text-align: center">Messages and originals are deleted automatically after 30 days.</p>
+    </div>
+
+    <script src="/message.js" defer></script>
+  </body>
+</html>
+
