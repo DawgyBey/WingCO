@@ -18,11 +18,17 @@ const IP_SLACK = 3; // per-network cap = FREE_TRIES * IP_SLACK (shared office ne
 const K_MIN = 5;
 const PORT = Number(process.env.PORT) || 8000;
 const SALT = process.env.UID_SALT || "change-me";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_BASE_URL = (process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, "");
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "";
 const HF_BASE_URL = (process.env.HF_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
 const HF_MODEL = process.env.HF_MODEL || "Qwen/Qwen3-8B";
-const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "";
-const HF_MAX_TOKENS = parseInt(process.env.HF_MAX_TOKENS, 10) || 1500; // headroom for reasoning models
-const HF_TIMEOUT_MS = parseInt(process.env.HF_TIMEOUT_MS, 10) || 60000;
+const AI_API_KEY = GROQ_API_KEY || HF_API_KEY;
+const AI_BASE_URL = (GROQ_API_KEY ? GROQ_BASE_URL : HF_BASE_URL).replace(/\/$/, "");
+const AI_MODEL = GROQ_API_KEY ? GROQ_MODEL : HF_MODEL;
+const AI_MAX_TOKENS = parseInt(process.env.GROQ_MAX_TOKENS ?? process.env.HF_MAX_TOKENS, 10) || 1500; // headroom for reasoning models
+const AI_TIMEOUT_MS = parseInt(process.env.GROQ_TIMEOUT_MS ?? process.env.HF_TIMEOUT_MS, 10) || 60000;
 const DEV_PRO_KEYS = new Set((process.env.DEV_PRO_KEYS || "").split(",").filter(Boolean)); // dev only
 const TOPICS = ["deadlines", "scope_changes", "unclear_requirements", "workload",
   "communication", "feedback_criticism", "payment_delays", "meetings", "other"];
@@ -33,9 +39,9 @@ if (!process.env.UID_SALT || process.env.UID_SALT === "change-me")
   console.warn("[wingco] WARNING: UID_SALT is still the default; set it in backend/.env for stable hashing.");
 if (!process.env.MASTER_KEY)
   console.warn("[wingco] WARNING: MASTER_KEY is not set; org admin endpoints will reject requests until configured.");
-if (!HF_API_KEY)
-  console.warn("[wingco] WARNING: HUGGINGFACE_API_KEY is not set; rewrite requests will fail until configured.");
-console.log(`[wingco] Using Hugging Face model ${HF_MODEL} via ${HF_BASE_URL}`);
+if (!AI_API_KEY)
+  console.warn("[wingco] WARNING: no AI API key is set; rewrite requests will fail until configured.");
+console.log(`[wingco] Using ${GROQ_API_KEY ? "Groq" : "Hugging Face"} model ${AI_MODEL} via ${AI_BASE_URL}`);
 
 const db = new Database(process.env.DB_PATH || path.join(BASE_DIR, "wingco.db"));
 db.pragma("journal_mode = WAL");
@@ -115,8 +121,9 @@ const logRequest = (method, route, meta = {}) => {
 app.get("/health", (_req, res) => res.json({
   status: "ok",
   backend: "node",
-  model: HF_MODEL,
-  hf_configured: !!HF_API_KEY,
+  provider: GROQ_API_KEY ? "groq" : "huggingface",
+  model: AI_MODEL,
+  ai_configured: !!AI_API_KEY,
   billing_configured: !!stripe,
 }));
 
@@ -145,21 +152,21 @@ async function callHF(messages) {
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), HF_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
     try {
-      const r = await fetch(`${HF_BASE_URL}/chat/completions`, {
+      const r = await fetch(`${AI_BASE_URL}/chat/completions`, {
         method: "POST",
         signal: ctrl.signal,
-        headers: { Authorization: `Bearer ${HF_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: HF_MODEL, temperature: 0.2, max_tokens: HF_MAX_TOKENS, messages }),
+        headers: { Authorization: `Bearer ${AI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: AI_MODEL, temperature: 0.2, max_tokens: AI_MAX_TOKENS, messages }),
       });
       const data = await r.json().catch(() => ({}));
       if (r.ok) return data;
-      const msg = typeof data?.error === "string" ? data.error : data?.error?.message || `HF error ${r.status}`;
+      const msg = typeof data?.error === "string" ? data.error : data?.error?.message || `${GROQ_API_KEY ? "Groq" : "HF"} error ${r.status}`;
       lastErr = new Error(`${r.status}: ${msg}`);
       if (![429, 502, 503, 504].includes(r.status)) throw lastErr; // only retry transient failures
     } catch (e) {
-      lastErr = e.name === "AbortError" ? new Error("Hugging Face request timed out") : e;
+      lastErr = e.name === "AbortError" ? new Error(`${GROQ_API_KEY ? "Groq" : "Hugging Face"} request timed out`) : e;
       if (/^[0-9]{3}:/.test(lastErr.message) && !/^(429|50[234]):/.test(lastErr.message)) throw lastErr;
     } finally { clearTimeout(timer); }
     await new Promise((ok) => setTimeout(ok, 1500));
@@ -200,7 +207,7 @@ app.post("/rewrite", async (req, res) => {
   if (!apiKey) return res.status(401).json({ detail: "Missing API key" });
   if (typeof text !== "string" || !text.trim() || text.length > 4000)
     return res.status(422).json({ detail: "Text must be 1-4000 characters" });
-  if (!HF_API_KEY) return res.status(503).json({ detail: "Server has no Hugging Face API key configured" });
+  if (!AI_API_KEY) return res.status(503).json({ detail: "Server has no AI API key configured" });
   if (!TONES.includes(tone)) tone = "diplomatic";
   if (!RECIPIENTS.includes(recipient)) recipient = "manager";
 

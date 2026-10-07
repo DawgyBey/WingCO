@@ -7,13 +7,13 @@ messages using a **Hugging Face** model, plus an optional anonymous team dashboa
 ## 1. Run the backend
 ```bash
 cd backend
-cp .env.example .env      # then fill in HUGGINGFACE_API_KEY, HF_MODEL, MASTER_KEY, UID_SALT
+cp .env.example .env      # then fill in GROQ_API_KEY, MASTER_KEY, UID_SALT
 npm install
 npm start                 # http://localhost:8000
 curl localhost:8000/health
 ```
-- `HUGGINGFACE_API_KEY`: token from https://huggingface.co/settings/tokens with the **Inference Providers** permission.
-- `HF_MODEL`: any chat model available on the router, e.g. `Qwen/Qwen3-8B` or `meta-llama/Llama-3.1-8B-Instruct`.
+- `GROQ_API_KEY`: key from https://console.groq.com/keys. The default `GROQ_MODEL` is `openai/gpt-oss-120b`; choose a model enabled for your Groq account.
+- Hugging Face remains available as a fallback: set `HUGGINGFACE_API_KEY` (with the **Inference Providers** permission) and optionally `HF_MODEL` to a chat model available on the router, such as `Qwen/Qwen3-8B`.
   If rewrites fail with 502, check the backend log: a wrong model name or missing permission shows up there.
 - Reasoning models (Qwen3 etc.) are supported: `<think>` blocks are stripped. Raise `HF_MAX_TOKENS` if they get cut off.
 - Generate secrets with `openssl rand -hex 24` for `MASTER_KEY` and `UID_SALT`.

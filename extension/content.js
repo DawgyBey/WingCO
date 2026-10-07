@@ -96,8 +96,6 @@
           <button class="a p" id="upgrade" type="button">Upgrade to Pro</button>
         </div>
         <div id="reviewNote" hidden>🏢 <span id="reviewText">Your company can read the original of this message once you replace it.</span></div>
-        <label class="chk" id="unmaskRow"><input type="checkbox" id="unmask" checked><span>Add a “polished by WingCO” link</span></label>
-        <div id="warn">Anyone with Unmask Premium who opens that link can see your original text. Uncheck to keep it private.</div>
         <div class="row" id="actions">
           <button class="a p" id="replace" type="button">Replace</button>
           <button class="a" id="copy" type="button">Copy</button>
@@ -142,8 +140,6 @@
     $("copy").disabled = !done;
     $("retry").disabled = busy;
     $("replace").hidden = ctx?.kind === "page";
-    const showLink = ctx?.kind !== "page" && !paywall;
-    $("unmaskRow").hidden = !showLink; $("warn").hidden = !showLink;
   }
 
   // ---------- capture what to rewrite ----------
@@ -283,10 +279,9 @@
   async function openPanel() {
     ctx = captureContext();
     if (!ctx) { hideButton(); return; }
-    const saved = await store.get(["tone", "recipient", "unmask"]);
+    const saved = await store.get(["tone", "recipient"]);
     if (saved.tone) $("tone").value = saved.tone;
     if (saved.recipient) $("recipient").value = saved.recipient;
-    $("unmask").checked = saved.unmask !== false;
     $("title").textContent = ctx.kind !== "page" && ctx.text.length < getTextLength() ? "Polish selection" : ctx.kind === "page" ? "Polish selected text" : "Polish message";
     panel.style.display = "block";
     placePanel();
@@ -323,12 +318,10 @@
     if (!rewrite || !ctx || ctx.kind === "page" || busy) return;
     $("replace").disabled = true;
     let final = rewrite, note = "";
-    if ($("unmask").checked || reviewActive) {
+    if (reviewActive) {
       const r = await sendMessage({ type: "publish", original, polished: rewrite });
-      if (r.ok) { if ($("unmask").checked) final = `${rewrite}\n\n— polished by WingCO · ${r.url}`; }
-      else note = `Couldn't save the message (${r.error}); inserted without a link.`;
+      if (!r.ok) note = `Couldn't save the message (${r.error}); inserted without saving.`;
     }
-    store.set({ unmask: $("unmask").checked });
     if (!ctx.el || !document.contains(ctx.el)) { setState("error", "The text box is gone. Use Copy instead."); $("copy").disabled = false; return; }
     if (ctx.kind === "field") applyToField(ctx.el, ctx, final); else applyToRich(ctx.el, ctx, final);
     closePanel();
