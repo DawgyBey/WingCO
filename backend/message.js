@@ -14,17 +14,24 @@ try {
 const id = location.pathname.split("/").pop();
 
 async function load() {
-  const res = await fetch(`/api/m/${encodeURIComponent(id)}`, {
-    headers: { "X-Viewer-Key": viewerKey },
-  });
+  let res;
+  try {
+    res = await fetch(`/api/m/${encodeURIComponent(id)}`, { headers: { "X-Viewer-Key": viewerKey } });
+  } catch {
+    $("polished").textContent = "Can't reach the server. Try again in a moment.";
+    return;
+  }
 
   if (!res.ok) {
     $("polished").textContent = "This message was not found or has expired.";
+    $("lock").hidden = true;
+    $("orig").hidden = true;
     return;
   }
 
   const data = await res.json();
   $("polished").textContent = data.polished;
+  if (data.retention_days) $("retention").textContent = `Messages and originals are deleted automatically after ${data.retention_days} days.`;
   $("lock").hidden = data.unlocked;
   $("orig").hidden = !data.unlocked;
 
@@ -35,7 +42,8 @@ async function load() {
 
 $("up").onclick = async () => {
   $("err").textContent = "";
-
+  $("up").disabled = true;
+  try {
   const res = await fetch("/billing/checkout", {
     method: "POST",
     headers: {
@@ -53,6 +61,11 @@ $("up").onclick = async () => {
     location.href = data.url;
   } else {
     $("err").textContent = data.detail || "Error";
+  }
+  } catch {
+    $("err").textContent = "Can't reach the server.";
+  } finally {
+    $("up").disabled = false;
   }
 };
 

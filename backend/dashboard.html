@@ -1,55 +1,240 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>WingCO Team Pulse</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WingCO Team Pulse</title>
 <style>
-:root{--bg:#f7f7fa;--card:#fff;--fg:#16161d;--mut:#6b6b7a;--acc:#4f46e5;--bar:#e4e4ee}
-@media(prefers-color-scheme:dark){:root{--bg:#121218;--card:#1c1c26;--fg:#eee;--mut:#9a9aab;--bar:#2c2c3a}}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:24px}
-.wrap{max-width:900px;margin:auto}.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:12px}
-.big{font-size:28px;font-weight:700}.mut{color:var(--mut);font-size:13px}
-.row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.lab{width:150px;overflow:hidden;text-overflow:ellipsis}
-.track{flex:1;background:var(--bar);border-radius:4px;height:14px}.fill{height:100%;border-radius:4px;background:var(--acc)}
-input,select,button{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--bar);background:var(--card);color:var(--fg)}
-button{background:var(--acc);color:#fff;border:0;cursor:pointer}
-</style></head><body><div class="wrap">
-<h1>WingCO Team Pulse</h1>
-<p class="mut">Anonymous, aggregated trends only. Individual messages and identities are never visible, and any group with fewer than 5 people is hidden.</p>
-<div class="card"><input id="tok" type="password" placeholder="Admin token" style="width:260px">
-<select id="days"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select>
-<button id="go">Load</button> <span id="err" class="mut"></span></div>
-<div class="card"><b>Billing</b> <span class="mut">per-seat subscription, minimum 5 seats</span><br><br>
-<input id="seats" type="number" min="5" value="10" style="width:90px"> seats
-<button id="sub">Subscribe / change plan</button> <button id="manage">Manage billing</button> <span id="berr" class="mut"></span></div>
-<div id="out"></div></div>
+:root{--bg:#f4f4fb;--card:#fff;--fg:#17172b;--mut:#686880;--acc:#4f46e5;--acc2:#7c3aed;--bar:#e6e6f2;--err:#b91c1c}
+@media(prefers-color-scheme:dark){:root{--bg:#121218;--card:#1c1c26;--fg:#eeeef7;--mut:#9a9ab0;--bar:#2c2c3a;--err:#f87171}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg);padding:28px 16px}
+.wrap{max-width:920px;margin:auto}h1{margin:0 0 4px;font-size:24px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:12px}
+.grid2{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bar);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(40,30,90,.05)}
+.grid2 .card{margin:0}.big{font-size:30px;font-weight:800}.mut{color:var(--mut);font-size:13px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px}.lab{width:140px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{flex:1;background:var(--bar);border-radius:5px;height:14px;overflow:hidden}.fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.val{width:120px;flex:none;text-align:right}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select,button{font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--bar);background:var(--card);color:var(--fg)}
+button{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:0;font-weight:600;cursor:pointer}
+button.s{background:transparent;color:var(--acc);border:1px solid var(--bar)}button:disabled{opacity:.6}
+:focus-visible{outline:3px solid #a5a0f5;outline-offset:2px}
+.err{color:var(--err)}h2{margin:0 0 8px;font-size:15px}
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--bar)}
+.tab{background:none;color:var(--mut);border:0;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px;font-weight:600}
+.tab[aria-selected=true]{color:var(--acc);border-bottom-color:var(--acc)}
+.msg{border:1px solid var(--bar);border-radius:12px;margin-bottom:10px;background:var(--card);overflow:hidden}
+.msg>button.head{all:unset;box-sizing:border-box;display:block;width:100%;padding:12px 14px;cursor:pointer}
+.msg>button.head:hover{background:var(--bar)}.msg .who{font-weight:700}.msg .snip{color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg .body{padding:0 14px 14px;align-items:start;display:grid;gap:10px;grid-template-columns:1fr 1fr}
+@media(max-width:640px){.msg .body{grid-template-columns:1fr}}
+.pane{border-radius:10px;padding:10px 12px;background:var(--bar)}.pane.orig{border:1px solid var(--warn)}
+.pane h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.pane pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit}
+.notice{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px}
+.switch{display:flex;gap:10px;align-items:flex-start}.switch input{width:18px;height:18px;margin-top:3px;padding:0;accent-color:var(--acc)}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bar)}th{color:var(--mut);font-weight:600}
+.msg .body .linkbtn{grid-column:1/-1;justify-self:start}.linkbtn{background:none;color:var(--err);padding:0;font-size:12px;border:0;text-decoration:underline}
+:root{--warn:#f59e0b}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>WingCO Team Pulse</h1>
+  <p class="mut"><b>Trends</b> are anonymous aggregates; any group with fewer than 5 people is hidden. Individual messages are visible only under <b>Message review</b>, which is off by default, disclosed to employees, and audited.</p>
+
+  <div class="card"><div class="bar">
+    <input id="tok" type="password" placeholder="Admin token" autocomplete="off" style="width:260px">
+    <select id="days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option></select>
+    <button id="go">Load</button><span id="err" class="mut err" role="alert"></span>
+  </div></div>
+
+  <div class="card"><h2>Billing</h2><div class="mut" style="margin-bottom:10px">Per-seat subscription, minimum 5 seats.</div>
+    <div class="bar"><input id="seats" type="number" min="5" value="10" style="width:90px" aria-label="Seats"> <span class="mut">seats</span>
+    <button id="sub">Subscribe / change plan</button><button class="s" id="manage">Manage billing</button><span id="berr" class="mut err" role="alert"></span></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="trends" aria-selected="true">Trends</button>
+    <button class="tab" role="tab" data-tab="messages" aria-selected="false">Message review</button>
+    <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings &amp; audit log</button>
+  </div>
+
+  <section id="tab-trends"><div id="out" aria-live="polite"></div></section>
+
+  <section id="tab-messages" hidden>
+    <div id="reviewOff" class="card" hidden>
+      <h2>Message review is off</h2>
+      <p class="mut">Employees' original messages aren't stored for your company. Turn it on under <b>Settings &amp; audit log</b>.</p>
+    </div>
+    <div id="reviewOn" hidden>
+      <div class="bar" style="margin-bottom:12px"><input id="q" type="search" placeholder="Search names or text on this page…" style="flex:1;min-width:200px"><button class="s" id="reload">Refresh</button></div>
+      <div id="msgs"></div>
+      <div class="bar" style="justify-content:center"><button class="s" id="more" hidden>Load older</button></div>
+    </div>
+  </section>
+
+  <section id="tab-settings" hidden>
+    <div class="card">
+      <h2>Message review</h2>
+      <div class="notice"><b>Employee disclosure.</b> When this is on, employees who join with your company code are shown a notice and must accept it before joining. After that, the <b>original and polished text of each message they replace</b> is stored (encrypted, auto-deleted after <span id="ret">30</span> days) and visible to company admins here. Drafts that are only previewed are never stored. Every time an admin opens an original it is recorded in the audit log below. Check your local privacy and employment rules before enabling.</div>
+      <label class="switch"><input type="checkbox" id="reviewToggle"><span><b>Let company admins review original messages</b><br><span class="mut" id="reviewState"></span></span></label>
+      <div id="setErr" class="err" role="alert"></div>
+    </div>
+    <div class="card"><h2>Audit log</h2><div id="audit" class="mut">Load with your admin token.</div></div>
+  </section>
+</div>
 <script>
-const $=id=>document.getElementById(id);
-const card=(t,body)=>{const c=document.createElement("div");c.className="card";
-  const h=document.createElement("b");h.textContent=t;c.append(h,body);return c};
-function bars(rows,label=k=>k){const w=document.createElement("div");
-  if(!rows.length){w.className="mut";w.textContent="Not enough people in any group yet.";return w}
-  const max=Math.max(...rows.map(r=>r.count));
-  rows.forEach(r=>{const d=document.createElement("div");d.className="row";
-    d.innerHTML='<div class="lab"></div><div class="track"><div class="fill"></div></div><div class="mut"></div>';
-    d.children[0].textContent=label(r.key);d.children[1].firstChild.style.width=(r.count/max*100)+"%";
-    d.children[2].textContent=r.count+" · intensity "+r.avg_intensity;w.append(d)});return w}
-async function load(){
-  $("err").textContent="";$("out").replaceChildren();
-  const r=await fetch("/api/summary?days="+$("days").value,{headers:{"X-Admin-Token":$("tok").value}});
-  if(!r.ok){$("err").textContent="Invalid token";return}
-  const s=await r.json();
-  if(s.insufficient){const p=document.createElement("p");p.className="mut";
-    p.textContent="Not enough activity yet. Trends appear once at least "+s.k+" people have used WingCO.";
-    $("out").append(p);return}
-  const g=document.createElement("div");g.className="grid";
-  [["Active users",s.active_users],["Rewrites",s.rewrites],["Avg frustration (1-5)",s.avg_intensity]].forEach(([l,v])=>{
-    const c=document.createElement("div");c.className="card";c.innerHTML='<div class="big"></div><div class="mut"></div>';
-    c.children[0].textContent=v;c.children[1].textContent=l;g.append(c)});
-  $("out").append(g,card("Frustration topics",bars(s.by_topic)),card("Directed at",bars(s.by_recipient)),
-    card("By day",bars(s.by_day)),card("By hour of day",bars(s.by_hour,h=>h+":00")))}
-async function bill(path,body){$("berr").textContent="";
-  const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Token":$("tok").value},body:JSON.stringify(body||{})});
-  const d=await r.json();if(d.url)location.href=d.url;else $("berr").textContent=d.detail||"Error"}
-$("sub").onclick=()=>bill("/billing/checkout",{plan:"team",seats:+$("seats").value});
-$("manage").onclick=()=>bill("/billing/portal");
-$("go").onclick=load;
-</script></body></html>
+const $ = (id) => document.getElementById(id);
+const TOPIC = { deadlines: "Deadlines", scope_changes: "Scope changes", unclear_requirements: "Unclear requirements",
+  workload: "Workload", communication: "Communication", feedback_criticism: "Feedback / criticism",
+  payment_delays: "Payment delays", meetings: "Meetings", other: "Other" };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function card(title, body) { const c = el("div", "card"); c.append(el("h2", "", title), body); return c; }
+function bars(rows, label = (k) => k) {
+  const w = el("div");
+  if (!rows.length) { w.className = "mut"; w.textContent = "Not enough people in any group yet."; return w; }
+  const max = Math.max(...rows.map((r) => r.count));
+  for (const r of rows) {
+    const d = el("div", "row"), track = el("div", "track"), fill = el("div", "fill");
+    fill.style.width = (r.count / max) * 100 + "%";
+    track.append(fill);
+    const lab = el("div", "lab", label(r.key)); lab.title = lab.textContent;
+    d.append(lab, track, el("div", "mut val", `${r.count} · intensity ${r.avg_intensity}`));
+    w.append(d);
+  }
+  return w;
+}
+
+async function load() {
+  $("err").textContent = ""; $("out").replaceChildren();
+  const token = $("tok").value.trim();
+  if (!token) { $("err").textContent = "Enter your admin token"; return; }
+  $("go").disabled = true;
+  try {
+    const r = await fetch("/api/summary?days=" + $("days").value, { headers: { "X-Admin-Token": token } });
+    if (!r.ok) { $("err").textContent = r.status === 401 ? "Invalid admin token" : "Couldn't load data"; return; }
+    try { sessionStorage.setItem("wingcoAdmin", token); } catch {}
+    const s = await r.json();
+    if (s.insufficient) {
+      $("out").append(el("p", "mut", `Not enough activity yet. Trends appear once at least ${s.k} people have used WingCO.`));
+      return;
+    }
+    const g = el("div", "grid");
+    for (const [l, v] of [["Active users", s.active_users], ["Rewrites", s.rewrites], ["Avg frustration (1-5)", s.avg_intensity]]) {
+      const c = el("div", "card"); c.append(el("div", "big", v), el("div", "mut", l)); g.append(c);
+    }
+    const g2 = el("div", "grid2");
+    g2.append(card("Frustration topics", bars(s.by_topic, (k) => TOPIC[k] || k)),
+              card("Directed at", bars(s.by_recipient, (k) => k[0].toUpperCase() + k.slice(1))),
+              card("By day", bars(s.by_day)),
+              card("By hour of day", bars(s.by_hour, (h) => String(h).padStart(2, "0") + ":00")));
+    $("out").append(g, g2);
+  } catch { $("err").textContent = "Can't reach the server"; }
+  finally { $("go").disabled = false; }
+}
+
+async function bill(path, body) {
+  $("berr").textContent = "";
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("tok").value.trim() }, body: JSON.stringify(body || {}) });
+    const d = await r.json();
+    if (d.url) location.href = d.url; else $("berr").textContent = d.detail || "Error";
+  } catch { $("berr").textContent = "Can't reach the server"; }
+}
+$("sub").onclick = () => bill("/billing/checkout", { plan: "team", seats: +$("seats").value });
+$("manage").onclick = () => bill("/billing/portal");
+$("go").onclick = loadAll;
+$("tok").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAll(); });
+
+// ---------- tabs ----------
+for (const t of document.querySelectorAll(".tab")) t.onclick = () => {
+  for (const x of document.querySelectorAll(".tab")) x.setAttribute("aria-selected", String(x === t));
+  for (const sec of ["trends", "messages", "settings"]) $("tab-" + sec).hidden = sec !== t.dataset.tab;
+};
+
+const api = (path, opts = {}) => fetch(path, { ...opts, headers: { "X-Admin-Token": $("tok").value.trim(), "Content-Type": "application/json", ...(opts.headers || {}) } });
+const fmt = (ts) => new Date(ts).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+let reviewOn = false, nextCursor = null;
+
+async function loadSettings() {
+  const r = await api("/api/org/settings");
+  if (!r.ok) return;
+  const s = await r.json();
+  reviewOn = s.review_enabled;
+  $("ret").textContent = s.retention_days;
+  $("reviewToggle").checked = reviewOn;
+  $("reviewState").textContent = reviewOn ? "On: new messages from employees who accepted the notice are stored." : "Off: nothing is stored for your company.";
+  $("reviewOff").hidden = reviewOn; $("reviewOn").hidden = !reviewOn;
+  if (reviewOn) loadMessages(true);
+  loadAudit();
+}
+
+$("reviewToggle").onchange = async (e) => {
+  $("setErr").textContent = "";
+  const want = e.target.checked;
+  if (want && !confirm("Employees will be told that your company can read the original text of messages they replace with WingCO, and must accept that to join. Turn on message review?")) { e.target.checked = false; return; }
+  const r = await api("/api/org/settings", { method: "POST", body: JSON.stringify({ review_enabled: want }) });
+  if (!r.ok) { $("setErr").textContent = "Couldn't save the setting"; e.target.checked = !want; return; }
+  loadSettings();
+};
+
+async function loadMessages(reset) {
+  if (reset) { $("msgs").replaceChildren(); nextCursor = null; }
+  const r = await api("/api/org/messages?limit=30" + (nextCursor ? "&before=" + nextCursor : ""));
+  if (!r.ok) return;
+  const d = await r.json();
+  if (reset && !d.messages.length) $("msgs").append(el("div", "card mut", "No reviewed messages yet. They appear here once employees who accepted the notice replace text with a WingCO rewrite."));
+  for (const m of d.messages) $("msgs").append(msgItem(m));
+  nextCursor = d.next; $("more").hidden = !d.next;
+  applyFilter();
+}
+
+function msgItem(m) {
+  const wrap = el("div", "msg"); wrap.dataset.search = (m.label + " " + m.polished).toLowerCase();
+  const head = el("button", "head"); head.type = "button"; head.setAttribute("aria-expanded", "false");
+  const top = el("div", "bar"); top.append(el("span", "who", m.label), el("span", "mut", fmt(m.created)));
+  head.append(top, el("div", "snip", m.polished.replace(/\s+/g, " ")));
+  const body = el("div", "body"); body.hidden = true; let loaded = false;
+  head.onclick = async () => {
+    body.hidden = !body.hidden; head.setAttribute("aria-expanded", String(!body.hidden));
+    if (body.hidden || loaded) return;
+    body.replaceChildren(el("div", "mut", "Loading original…"));
+    const r = await api("/api/org/messages/" + encodeURIComponent(m.id));
+    if (!r.ok) { body.replaceChildren(el("div", "err", "This message has expired or was deleted.")); return; }
+    const d = await r.json(); loaded = true;
+    const mk = (t, txt, cls) => { const p = el("div", "pane " + (cls || "")); const pre = el("pre", "", txt); p.append(el("h4", "", t), pre); return p; };
+    const del = el("button", "linkbtn", "Delete this message"); del.type = "button";
+    del.onclick = async () => { if (confirm("Delete this message and its original permanently?")) { await api("/api/org/messages/" + encodeURIComponent(m.id), { method: "DELETE" }); wrap.remove(); loadAudit(); } };
+    body.replaceChildren(mk("Original (as written)", d.original, "orig"), mk("Sent (polished)", d.polished), del);
+    loadAudit();
+  };
+  wrap.append(head, body); return wrap;
+}
+
+function applyFilter() {
+  const q = $("q").value.trim().toLowerCase();
+  for (const m of $("msgs").children) if (m.dataset.search !== undefined) m.hidden = !!q && !m.dataset.search.includes(q);
+}
+$("q").oninput = applyFilter; $("reload").onclick = () => loadMessages(true); $("more").onclick = () => loadMessages(false);
+
+const ACTION = { viewed_original: "Opened an original", review_enabled: "Turned message review on", review_disabled: "Turned message review off", deleted_message: "Deleted a message" };
+async function loadAudit() {
+  const r = await api("/api/org/audit"); if (!r.ok) return;
+  const { entries } = await r.json();
+  if (!entries.length) { $("audit").textContent = "No activity yet."; return; }
+  const t = el("table"), h = el("tr"); for (const x of ["When", "Action", "Message"]) h.append(el("th", "", x)); t.append(h);
+  for (const e of entries) { const tr = el("tr"); tr.append(el("td", "", fmt(e.ts)), el("td", "", ACTION[e.action] || e.action), el("td", "mut", e.msg_id || "")); t.append(tr); }
+  $("audit").replaceChildren(t);
+}
+
+async function loadAll() { await load(); if ($("err").textContent === "") loadSettings(); }
+try { const t = sessionStorage.getItem("wingcoAdmin"); if (t) { $("tok").value = t; loadAll(); } } catch {}
+</script>
+</body>
+</html>

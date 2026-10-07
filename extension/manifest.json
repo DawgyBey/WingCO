@@ -1,40 +1,21 @@
 {
   "manifest_version": 3,
   "name": "WingCO",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your wingman at work: turn raw frustration into polite, professional messages.",
-  "permissions": [
-    "storage"
-  ],
-  "host_permissions": [
-    "http://localhost:8000/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost:8000/*"],
+  "background": { "service_worker": "background.js" },
   "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_idle"
-    }
+    { "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle", "all_frames": true }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["pfp.png"], "matches": ["<all_urls>"] }
   ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "WingCO",
-    "default_icon": {
-      "16": "pfp.png",
-      "48": "pfp.png",
-      "128": "pfp.png"
-    }
+    "default_icon": { "16": "pfp.png", "48": "pfp.png", "128": "pfp.png" }
   },
-  "icons": {
-    "16": "pfp.png",
-    "48": "pfp.png",
-    "128": "pfp.png"
-  }
+  "icons": { "16": "pfp.png", "48": "pfp.png", "128": "pfp.png" }
 }

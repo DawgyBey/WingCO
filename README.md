@@ -1,47 +1,62 @@
 # WingCO
-## Run the backend
-    source .venv/bin/activate
-    cd backend && pip install -r requirements.txt
-    # Add your HUGGINGFACE_API_KEY to backend/.env
-    uvicorn main:app --env-file .env --reload --port 8000
 
-Check the service is live:
-    curl http://localhost:8000/health
+Your wingman at work: a Chrome extension that turns raw, frustrated drafts into polite, professional
+messages using a **Hugging Face** model, plus an optional anonymous team dashboard, Stripe billing and
+"Unmask" links.
 
-Use PORT=... and BASE_URL=... if you need a custom local address without editing the app code.
-## Load the extension
-chrome://extensions → Developer mode → Load unpacked → select `extension/`
-Click into any text box, then hit the ✨ WingCO button.
-## B2B team dashboard
-    export MASTER_KEY=some-secret UID_SALT=another-secret
-    curl -X POST "localhost:8000/admin/orgs?name=Acme" -H "X-Master-Key: some-secret"
-Returns `org_code` (give to employees, they enter it in the extension popup) and `admin_token`
-(for HR/managers at http://localhost:8000/dashboard).
+## 1. Run the backend
+```bash
+cd backend
+cp .env.example .env      # then fill in HUGGINGFACE_API_KEY, HF_MODEL, MASTER_KEY, UID_SALT
+npm install
+npm start                 # http://localhost:8000
+curl localhost:8000/health
+```
+- `HUGGINGFACE_API_KEY`: token from https://huggingface.co/settings/tokens with the **Inference Providers** permission.
+- `HF_MODEL`: any chat model available on the router, e.g. `Qwen/Qwen3-8B` or `meta-llama/Llama-3.1-8B-Instruct`.
+  If rewrites fail with 502, check the backend log: a wrong model name or missing permission shows up there.
+- Reasoning models (Qwen3 etc.) are supported: `<think>` blocks are stripped. Raise `HF_MAX_TOKENS` if they get cut off.
+- Generate secrets with `openssl rand -hex 24` for `MASTER_KEY` and `UID_SALT`.
 
-## Node backend (alternative to Python)
-    cd backend-node && npm install
-    ANTHROPIC_API_KEY=... MASTER_KEY=... UID_SALT=... npm start
+## 2. Load the extension
+`chrome://extensions` → Developer mode → Load unpacked → select `extension/`.
+Type in any text box (or select text) and click the **WingCO** button. Pick a tone and recipient, then
+**Replace**, **Copy** or **Retry**. `Esc` closes the panel.
+To use a deployed backend, change `WINGCO_BASE` in `extension/config.js` and add the origin to `host_permissions` in `manifest.json`.
 
-Check the service is live:
-    curl http://localhost:8000/health
+## 3. Team dashboard (B2B)
+```bash
+curl -X POST "localhost:8000/admin/orgs?name=Acme" -H "X-Master-Key: $MASTER_KEY"
+```
+Returns `org_code` (employees enter it in the extension popup) and `admin_token` (HR opens
+http://localhost:8000/dashboard). Only anonymous aggregates are stored, and groups under 5 people are hidden.
 
-Same endpoints and dashboard as the Python version; the extension works with either unchanged.
+### Company message review
+Off by default. In the dashboard → **Settings & audit log**, an admin can turn on review. Then:
+- Employees entering your company code see a notice in the extension popup and **must accept it to join**; the panel also shows a banner whenever their original will be saved.
+- Only messages an employee actually **replaces** are stored (encrypted, auto-deleted after `RETENTION_DAYS`); previews are never stored.
+- Admins read originals under **Message review**. Each opened original, deletion and setting change is recorded in the audit log. Admins can delete messages.
+- Employees can set an optional display name; otherwise they appear as a numbered member (e.g. "Member 3fa91c").
+Check local privacy and employment rules (e.g. GDPR, works councils) before turning it on.
 
-## Stripe billing (Node backend)
-1. Stripe Dashboard → Products: create **Pro** (recurring, e.g. $6/mo) and **Team** (recurring, per seat, e.g. $5/seat/mo). Copy both price IDs.
-2. Webhooks → add endpoint `https://YOUR_DOMAIN/stripe/webhook` with events `customer.subscription.created`, `.updated`, `.deleted`. Copy the signing secret.
-   Local testing: `stripe listen --forward-to localhost:8000/stripe/webhook`
-3. Fill in `backend-node/.env.example` values as environment variables.
-4. Enable the Customer Portal in Stripe (Settings → Billing → Customer portal).
-Individuals upgrade from the extension popup; company admins subscribe from /dashboard.
+## Free tier and paywall
+Individual users (no paying plan) get `FREE_TRIES` rewrites in total (default **3**), then the extension shows an upgrade card that opens Stripe Checkout. Counts are stored in SQLite per client key and per network (`TRUST_PROXY=1` behind a reverse proxy), so reinstalling the extension doesn't reset them. Failed rewrites don't count. Stripe must be configured for the upgrade button to work.
 
-## Unmask (premium recipients see the original)
-When a sender hits Replace with the "polished by WingCO" link checked, their original is stored
-(AES-256-GCM encrypted, auto-deleted after `RETENTION_DAYS`) and a link is appended to the message.
-Anyone opening `/m/<id>` sees the polished text; viewers with an active **Unmask** subscription also
-see the original. The sender sees a warning in the panel first and can uncheck the link to keep the
-original private, and can delete a stored message at any time.
-- Encryption key: set `MESSAGE_KEY`, or leave it empty and a random key is created once in `.message_key`
-  (back this file up: without it, stored originals cannot be read).
-- Works on both backends. The Python backend supports the Unmask plan only; Pro/Team billing is in `backend-node`.
-- Needs a recurring Stripe price (`STRIPE_PRICE_UNMASK`) plus the webhook from the Stripe section above.
+## 4. Stripe billing (optional)
+1. Create recurring prices for **Pro**, **Team** (per seat) and **Unmask**; put the IDs in `.env`.
+2. Add a webhook to `https://YOUR_DOMAIN/stripe/webhook` for `customer.subscription.created/updated/deleted`
+   (locally: `stripe listen --forward-to localhost:8000/stripe/webhook`) and set `STRIPE_WEBHOOK_SECRET`.
+3. Enable the Customer Portal in Stripe.
+
+Without Stripe the paywall still blocks, but the upgrade button can't complete checkout. For testing, `DEV_PRO_KEYS` and `DEV_UNMASK_KEYS` unlock features for free.
+
+## Unmask
+When the sender leaves "Add a polished by WingCO link" checked, the original is stored AES-256-GCM encrypted
+(deleted after `RETENTION_DAYS`) and a link is appended to the message. Anyone can read the polished text;
+viewers with an active Unmask subscription also see the original. The sender is warned in the panel and
+can opt out. Back up `backend/.message_key` (or set `MESSAGE_KEY`): without it, stored originals can't be read.
+
+## Troubleshooting
+- **"Can't reach the WingCO server"**: backend isn't running, or `WINGCO_BASE` doesn't match its address.
+- **"Hugging Face rejected the API key or model access"**: token lacks Inference Providers permission or the model needs access approval.
+- **No WingCO button**: reload the extension, then refresh the page. It appears when a text field has text or text is selected.
